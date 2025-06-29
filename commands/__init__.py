@@ -14,6 +14,7 @@ from .delete_handler import DeleteHandler
 from .mcp_handler import MCPHandler
 from .mcp_config_handler import MCPConfigHandler
 from .view_handler import ViewHandler
+from .recent_handler import RecentHandler
 
 __all__ = [
     "BaseCommand",
@@ -26,5 +27,6 @@ __all__ = [
     "DeleteHandler",
     "MCPHandler",
     "MCPConfigHandler",
-    "ViewHandler"
+    "ViewHandler",
+    "RecentHandler"
 ]

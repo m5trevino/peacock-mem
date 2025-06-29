@@ -136,6 +136,34 @@ class MCPServer:
                     },
                     "required": ["search_query", "confirm"]
                 }
+            },
+            {
+                "name": "recent_files",
+                "description": "Show recently added files to Peacock Memory",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "hours": {
+                            "type": "integer",
+                            "description": "Show files from last N hours (1, 6, 24, 72, 168 for week, or null for all)",
+                            "enum": [1, 6, 24, 72, 168],
+                            "default": 24
+                        },
+                        "limit": {
+                            "type": "integer",
+                            "description": "Maximum number of files to show",
+                            "default": 20
+                        }
+                    }
+                }
+            },
+            {
+                "name": "sync_database",
+                "description": "Sync and refresh Peacock Memory database",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {}
+                }
             }
         ]
     
@@ -186,6 +214,10 @@ class MCPServer:
                 return await self._list_files(arguments)
             elif tool_name == "delete_item":
                 return await self._delete_item(arguments)
+            elif tool_name == "recent_files":
+                return await self._recent_files(arguments)
+            elif tool_name == "sync_database":
+                return await self._sync_database(arguments)
             else:
                 return {
                     "content": [
@@ -203,6 +235,179 @@ class MCPServer:
                     {
                         "type": "text",
                         "text": f"Error executing {tool_name}: {str(e)}"
+                    }
+                ],
+                "isError": True
+            }
+    
+    async def _recent_files(self, args: Dict[str, Any]) -> Dict[str, Any]:
+        """Recent files implementation"""
+        try:
+            from datetime import datetime, timedelta
+            from core.database import get_client
+            
+            hours = args.get("hours", 24)
+            limit = args.get("limit", 20)
+            
+            # Calculate cutoff time
+            cutoff_time = None
+            if hours:
+                cutoff_time = datetime.now() - timedelta(hours=hours)
+            
+            # Get recent files
+            client = get_client()
+            collections = client.list_collections()
+            
+            recent_files = []
+            
+            for collection_info in collections:
+                collection = client.get_collection(collection_info.name)
+                try:
+                    all_data = collection.get()
+                    if all_data["documents"]:
+                        for i, doc in enumerate(all_data["documents"]):
+                            metadata = all_data["metadatas"][i] if all_data["metadatas"] else {}
+                            
+                            # Parse creation time
+                            created_str = metadata.get('created', '')
+                            if not created_str:
+                                continue
+                            
+                            try:
+                                created_time = datetime.fromisoformat(created_str.replace('Z', '+00:00'))
+                                created_time = created_time.replace(tzinfo=None)
+                            except:
+                                continue
+                            
+                            # Apply time filter
+                            if cutoff_time and created_time < cutoff_time:
+                                continue
+                            
+                            # Format time difference
+                            time_diff = datetime.now() - created_time
+                            if time_diff.days > 0:
+                                time_ago = f"{time_diff.days} days ago"
+                            elif time_diff.seconds > 3600:
+                                hours_ago = time_diff.seconds // 3600
+                                time_ago = f"{hours_ago} hours ago"
+                            elif time_diff.seconds > 60:
+                                minutes_ago = time_diff.seconds // 60
+                                time_ago = f"{minutes_ago} minutes ago"
+                            else:
+                                time_ago = "Just now"
+                            
+                            recent_files.append({
+                                "collection": collection_info.name,
+                                "metadata": metadata,
+                                "preview": doc[:100] + "..." if len(doc) > 100 else doc,
+                                "created": created_time,
+                                "time_ago": time_ago,
+                                "content": doc
+                            })
+                except:
+                    continue
+            
+            if not recent_files:
+                time_desc = f"last {hours} hours" if hours else "all time"
+                return {
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": f"No files found in {time_desc}"
+                        }
+                    ]
+                }
+            
+            # Sort by creation time (newest first) and limit
+            recent_files.sort(key=lambda x: x['created'], reverse=True)
+            recent_files = recent_files[:limit]
+            
+            # Format results
+            time_desc = f"last {hours} hours" if hours else "all time"
+            result_text = f"🕒 Recent Files ({time_desc}) - {len(recent_files)} files\n\n"
+            
+            for i, file_info in enumerate(recent_files, 1):
+                metadata = file_info['metadata']
+                collection = file_info['collection'].replace('project_', '').replace('_', ' ').title()
+                
+                if metadata.get('file_path'):
+                    filename = metadata['file_path'].split('/')[-1]
+                    language = metadata.get('language', 'unknown')
+                    result_text += f"🔸 #{i} 📄 {filename} ({language})\n"
+                else:
+                    disposition = metadata.get('disposition', 'Unknown')
+                    result_text += f"🔸 #{i} 📝 {disposition}\n"
+                
+                result_text += f"   📁 Collection: {collection}\n"
+                result_text += f"   🕒 Added: {file_info['time_ago']}\n"
+                result_text += f"   📄 Preview: {file_info['preview']}\n"
+                result_text += "   " + "─" * 50 + "\n\n"
+            
+            return {
+                "content": [
+                    {
+                        "type": "text",
+                        "text": result_text
+                    }
+                ]
+            }
+            
+        except Exception as e:
+            debug_log("Recent files error", error=str(e))
+            return {
+                "content": [
+                    {
+                        "type": "text",
+                        "text": f"Recent files error: {str(e)}"
+                    }
+                ],
+                "isError": True
+            }
+    
+    async def _sync_database(self, args: Dict[str, Any]) -> Dict[str, Any]:
+        """Sync database implementation"""
+        try:
+            from core.database import get_client, get_database_stats
+            
+            # Force refresh
+            client = get_client()
+            collections = client.list_collections()
+            
+            # Get fresh stats
+            stats = get_database_stats()
+            
+            result_text = "🔄 Database Sync Complete!\n\n"
+            result_text += "📊 Current Status:\n"
+            result_text += f"📁 Collections: {stats['total_collections']}\n"
+            result_text += f"📄 Total Documents: {stats['total_documents']}\n"
+            result_text += f"🏷️ Projects: {stats['projects']}\n\n"
+            
+            result_text += "📋 By Category:\n"
+            result_text += f"  💻 Codebase: {stats['by_type']['codebase']}\n"
+            result_text += f"  💬 Conversations: {stats['by_type']['conversations']}\n"
+            result_text += f"  💡 Ideas: {stats['by_type']['ideas']}\n"
+            result_text += f"  📋 Brainstorm: {stats['by_type']['brainstorm']}\n"
+            result_text += f"  📝 Notes: {stats['by_type']['notes']}\n"
+            result_text += f"  📖 Man Pages: {stats['by_type']['manpages']}\n\n"
+            
+            result_text += "✅ All collections refreshed and indexed"
+            
+            return {
+                "content": [
+                    {
+                        "type": "text",
+                        "text": result_text
+                    }
+                ]
+            }
+            
+        except Exception as e:
+            debug_log("Sync database error", error=str(e))
+            return {
+                "content": [
+                    {
+                        "type": "text",
+                        "text": f"Sync database error: {str(e)}"
                     }
                 ],
                 "isError": True

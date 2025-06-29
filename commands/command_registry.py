@@ -18,6 +18,7 @@ from commands.mcp_handler import MCPHandler
 from commands.file_handler import FileHandler
 from commands.mcp_config_handler import MCPConfigHandler
 from commands.view_handler import ViewHandler
+from commands.recent_handler import RecentHandler
 from core.visuals import format_single_message
 
 class CommandRegistry:
@@ -40,7 +41,8 @@ class CommandRegistry:
             MCPHandler,
             FileHandler,
             MCPConfigHandler,
-            ViewHandler
+            ViewHandler,
+            RecentHandler
         ]
         
         for handler_class in handler_classes:
@@ -127,6 +129,10 @@ class CommandRegistry:
             "",
             "📄 View:",
             "  view                 - View complete files from memory",
+            "",
+            "🕒 Recent:",
+            "  recent               - Show recently added files",
+            "  sync                 - Sync and refresh database",
             "",
             "📋 List:",
             "  list                 - List items by category",
