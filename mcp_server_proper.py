@@ -131,7 +131,7 @@ class MCPServer:
                         "confirm": {
                             "type": "boolean",
                             "description": "Confirmation that you want to delete the item",
-                            "default": false
+                            "default": False
                         }
                     },
                     "required": ["search_query", "confirm"]
