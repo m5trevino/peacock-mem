@@ -4,10 +4,6 @@ rich>=13.0.0
 questionary>=2.0.0
 typer>=0.9.0
 
-# Optional MCP dependencies
-fastapi>=0.100.0
-uvicorn[standard]>=0.20.0
-
 # Utility dependencies
 pathlib2>=2.3.0
 python-dateutil>=2.8.0
