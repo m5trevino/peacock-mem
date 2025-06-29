@@ -13,6 +13,7 @@ from .project_handler import ProjectHandler
 from .delete_handler import DeleteHandler
 from .mcp_handler import MCPHandler
 from .mcp_config_handler import MCPConfigHandler
+from .view_handler import ViewHandler
 
 __all__ = [
     "BaseCommand",
@@ -24,5 +25,6 @@ __all__ = [
     "ProjectHandler",
     "DeleteHandler",
     "MCPHandler",
-    "MCPConfigHandler"
+    "MCPConfigHandler",
+    "ViewHandler"
 ]

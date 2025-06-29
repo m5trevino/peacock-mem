@@ -1,6 +1,6 @@
 """
 🦚 Peacock Memory - Search Handler
-Smart search across all memory types with filtering
+Smart search with file list and preview options
 """
 
 from typing import List, Optional
@@ -17,7 +17,6 @@ class SearchHandler(BaseCommand):
     
     def execute(self, command_input: str) -> Optional[str]:
         """Execute search command"""
-        # Interactive search menu
         return self._interactive_search()
     
     def _interactive_search(self) -> str:
@@ -84,7 +83,6 @@ class SearchHandler(BaseCommand):
         # Perform search
         if search_scope == "everything":
             results = search_all_collections(query, limit)
-            return self._format_search_results(results, query, "everything")
         elif search_scope == "multiple":
             all_results = []
             for category in selected_categories:
@@ -93,22 +91,78 @@ class SearchHandler(BaseCommand):
             
             # Sort by relevance and limit
             all_results.sort(key=lambda x: x["relevance"], reverse=True)
-            all_results = all_results[:limit]
-            
-            return self._format_search_results(all_results, query, f"multiple ({', '.join(selected_categories)})")
+            results = all_results[:limit]
         else:
             results = search_by_type(query, search_scope, limit)
-            return self._format_search_results(results, query, search_scope)
-    
-    def _format_search_results(self, results: List[dict], query: str, scope: str) -> str:
-        """Format search results for display"""
+        
         if not results:
             return self.format_warning([
                 f"🔍 No results found for: '{query}'",
-                f"📋 Searched in: {scope}",
+                f"📋 Searched in: {search_scope}",
                 "💡 Try different keywords or broader search scope"
             ])
         
+        # Display format selection
+        display_choices = [
+            questionary.Choice("📄 File list only", "list"),
+            questionary.Choice("📄 File list + previews", "preview")
+        ]
+        
+        display_format = questionary.select(
+            "📋 How do you want to see results?",
+            choices=display_choices
+        ).ask()
+        
+        if not display_format:
+            display_format = "list"
+        
+        if display_format == "list":
+            return self._format_file_list(results, query, search_scope)
+        else:
+            return self._format_with_previews(results, query, search_scope)
+    
+    def _format_file_list(self, results: List[dict], query: str, scope: str) -> str:
+        """Format search results as clean file list"""
+        # Header
+        header_msgs = [
+            f"🔍 Search Results for: '{query}'",
+            f"📋 Scope: {scope}",
+            f"📊 Found: {len(results)} results",
+            ""
+        ]
+        
+        # Results as clean list
+        result_msgs = []
+        for i, result in enumerate(results, 1):
+            relevance_score = f"{result['relevance']:.3f}"
+            collection_name = result['collection'].replace('project_', '').replace('_', ' ').title()
+            
+            # Format metadata info
+            metadata = result.get('metadata', {})
+            
+            if metadata.get('file_path'):
+                filename = metadata['file_path'].split('/')[-1]
+                language = metadata.get('language', 'unknown')
+                lines = metadata.get('lines', 'unknown')
+                
+                result_msgs.append(
+                    f"🔸 #{i} [{relevance_score}] 📄 {filename} ({language}, {lines} lines) | {collection_name}"
+                )
+            else:
+                disposition = metadata.get('disposition', 'Unknown')
+                created_date = metadata.get('created', 'Unknown')[:10] if metadata.get('created') else 'Unknown'
+                
+                result_msgs.append(
+                    f"🔸 #{i} [{relevance_score}] 📝 {disposition} ({created_date}) | {collection_name}"
+                )
+        
+        # Combine all messages
+        all_msgs = header_msgs + result_msgs
+        
+        return self.format_data(all_msgs)
+    
+    def _format_with_previews(self, results: List[dict], query: str, scope: str) -> str:
+        """Format search results with previews"""
         # Header
         header_msgs = [
             f"🔍 Search Results for: '{query}'",
@@ -116,7 +170,7 @@ class SearchHandler(BaseCommand):
             f"📊 Found: {len(results)} results"
         ]
         
-        # Results
+        # Results with previews
         result_msgs = []
         for i, result in enumerate(results, 1):
             relevance_score = f"{result['relevance']:.3f}"
@@ -129,7 +183,7 @@ class SearchHandler(BaseCommand):
             if metadata.get('disposition'):
                 meta_info.append(f"Type: {metadata['disposition']}")
             if metadata.get('created'):
-                created_date = metadata['created'][:10]  # Just date part
+                created_date = metadata['created'][:10]
                 meta_info.append(f"Created: {created_date}")
             if metadata.get('file_path'):
                 filename = metadata['file_path'].split('/')[-1]
@@ -173,17 +227,22 @@ Search Scopes:
   - Man pages            Manual pages and documentation
   - Multiple categories   Custom combination
 
+Display Formats:
+  - File list only       Clean list with filenames and metadata
+  - File list + previews Full results with content previews
+
 Features:
   - Semantic similarity search
   - Relevance scoring
   - Metadata filtering
-  - Preview snippets
+  - Clean file list format (no annoying previews)
+  - Optional preview mode when you need context
   - Configurable result limits
 
 Tips:
-  - Use specific keywords for better results
-  - Try different search scopes if no results
+  - Use file list format for quick scanning
+  - Use preview format when you need content context
   - Relevance scores help identify best matches
-  - Preview shows context around matches
+  - Try different search scopes if no results
         """
         return self.format_info([help_text.strip()])

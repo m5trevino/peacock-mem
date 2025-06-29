@@ -17,6 +17,7 @@ from commands.delete_handler import DeleteHandler
 from commands.mcp_handler import MCPHandler
 from commands.file_handler import FileHandler
 from commands.mcp_config_handler import MCPConfigHandler
+from commands.view_handler import ViewHandler
 from core.visuals import format_single_message
 
 class CommandRegistry:
@@ -38,7 +39,8 @@ class CommandRegistry:
             DeleteHandler,
             MCPHandler,
             FileHandler,
-            MCPConfigHandler
+            MCPConfigHandler,
+            ViewHandler
         ]
         
         for handler_class in handler_classes:
@@ -122,6 +124,9 @@ class CommandRegistry:
             "",
             "🔍 Search:",
             "  search               - Search through memory",
+            "",
+            "📄 View:",
+            "  view                 - View complete files from memory",
             "",
             "📋 List:",
             "  list                 - List items by category",
