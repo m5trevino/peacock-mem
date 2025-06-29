@@ -1,6 +1,6 @@
 """
 🦚 Peacock Memory - MCP Config Handler
-Configure Claude Desktop for MCP integration
+Configure Claude Desktop for proper MCP integration
 """
 
 import json
@@ -8,6 +8,7 @@ import shutil
 from pathlib import Path
 from typing import List, Optional
 from datetime import datetime
+import sys
 
 from commands.base_command import BaseCommand
 
@@ -22,7 +23,7 @@ class MCPConfigHandler(BaseCommand):
         return self._configure_claude_desktop()
     
     def _configure_claude_desktop(self) -> str:
-        """Configure Claude Desktop for MCP integration"""
+        """Configure Claude Desktop for proper MCP integration"""
         try:
             # Get Claude config path
             config_path = self._get_claude_config_path()
@@ -31,7 +32,10 @@ class MCPConfigHandler(BaseCommand):
                 return self.format_error([
                     "❌ Could not find Claude Desktop config directory",
                     "💡 Make sure Claude Desktop is installed",
-                    "📁 Expected path: ~/.config/Claude/"
+                    "📁 Expected paths:",
+                    "   Linux: ~/.config/Claude/",
+                    "   macOS: ~/Library/Application Support/Claude/",
+                    "   Windows: ~/AppData/Roaming/Claude/"
                 ])
             
             config_file = config_path / "claude_desktop_config.json"
@@ -39,8 +43,8 @@ class MCPConfigHandler(BaseCommand):
             # Backup existing config
             backup_result = self._backup_existing_config(config_file)
             
-            # Create new config
-            new_config = self._create_mcp_config()
+            # Create new config with proper MCP setup
+            new_config = self._create_proper_mcp_config()
             
             # Write config file
             config_file.parent.mkdir(parents=True, exist_ok=True)
@@ -52,14 +56,19 @@ class MCPConfigHandler(BaseCommand):
                 f"📁 Config written to: {config_file}",
                 "",
                 "🔧 Configuration details:",
-                "  - Server: peacock-memory-mcp",
-                "  - Host: 127.0.0.1:8000",
-                "  - Protocol: HTTP REST",
+                "  - Server: peacock-memory",
+                "  - Protocol: JSON-RPC over stdio (proper MCP)",
+                "  - Command: python mcp_server_proper.py",
                 "",
                 "🚀 Next steps:",
                 "1. Start MCP server: pea-mem → mcp",
                 "2. Restart Claude Desktop",
-                "3. MCP server will be available in Claude"
+                "3. MCP tools will be available in Claude",
+                "",
+                "🛠️ Available MCP Tools:",
+                "  - search_memory: Search Peacock Memory database",
+                "  - add_memory: Add content to memory",
+                "  - list_projects: List all projects"
             ]
             
             if backup_result:
@@ -70,14 +79,14 @@ class MCPConfigHandler(BaseCommand):
         except Exception as e:
             return self.format_error([
                 f"❌ Error configuring Claude Desktop: {str(e)}",
-                "💡 Make sure you have write permissions to ~/.config/Claude/"
+                "💡 Make sure you have write permissions to the config directory"
             ])
     
     def _get_claude_config_path(self) -> Optional[Path]:
         """Get Claude Desktop config path"""
         # Check common locations
         possible_paths = [
-            Path.home() / ".config" / "Claude",
+            Path.home() / ".config" / "Claude",  # Linux
             Path.home() / "Library" / "Application Support" / "Claude",  # macOS
             Path.home() / "AppData" / "Roaming" / "Claude"  # Windows
         ]
@@ -86,7 +95,7 @@ class MCPConfigHandler(BaseCommand):
             if path.exists() or path.parent.exists():
                 return path
         
-        # Default to ~/.config/Claude
+        # Default to Linux path
         return Path.home() / ".config" / "Claude"
     
     def _backup_existing_config(self, config_file: Path) -> Optional[str]:
@@ -103,36 +112,19 @@ class MCPConfigHandler(BaseCommand):
         except Exception as e:
             return f"⚠️ Could not backup config: {str(e)}"
     
-    def _create_mcp_config(self) -> dict:
-        """Create MCP configuration for Claude Desktop"""
+    def _create_proper_mcp_config(self) -> dict:
+        """Create proper MCP configuration for Claude Desktop"""
+        # Get the path to the MCP server
+        server_path = Path(__file__).parent.parent / "mcp_server_proper.py"
+        
         return {
             "mcpServers": {
                 "peacock-memory": {
-                    "command": "python",
-                    "args": [
-                        "-c",
-                        "import sys; sys.path.append('.'); from commands.mcp_handler import MCPHandler; MCPHandler().execute('mcp')"
-                    ],
-                    "env": {
-                        "PEACOCK_MCP_HOST": "127.0.0.1",
-                        "PEACOCK_MCP_PORT": "8000"
-                    }
+                    "command": sys.executable,
+                    "args": [str(server_path.absolute())],
+                    "env": {}
                 }
-            },
-            "defaultModel": "claude-3-sonnet-20240229",
-            "appearance": "dark"
-        }
-    
-    def _get_system_info(self) -> dict:
-        """Get system information for config"""
-        import platform
-        import sys
-        
-        return {
-            "platform": platform.system(),
-            "python_version": sys.version,
-            "python_executable": sys.executable,
-            "config_timestamp": datetime.now().isoformat()
+            }
         }
     
     def get_help(self) -> str:
@@ -148,13 +140,13 @@ Usage:
 What this does:
   1. Locates Claude Desktop config directory
   2. Backs up existing claude_desktop_config.json
-  3. Creates new config with Peacock Memory MCP server
-  4. Sets up proper connection parameters
+  3. Creates new config with proper MCP server setup
+  4. Uses JSON-RPC over stdio (proper MCP protocol)
 
 Configuration Details:
   - Server name: peacock-memory
-  - Protocol: HTTP REST (not stdio MCP)
-  - Host: 127.0.0.1:8000
+  - Protocol: JSON-RPC over stdio (not HTTP)
+  - Command: python mcp_server_proper.py
   - Auto-discovery of Python executable
 
 File Locations:
@@ -166,18 +158,18 @@ Setup Process:
   1. Run: pea-mem → mcp-config
   2. Start MCP server: pea-mem → mcp
   3. Restart Claude Desktop
-  4. MCP server appears in Claude's available tools
+  4. MCP tools appear in Claude's available tools
 
-Features:
-  - Automatic backup of existing config
-  - Cross-platform path detection
-  - Error handling and validation
-  - Timestamped backups
+Available MCP Tools:
+  - search_memory: Search through your memory database
+  - add_memory: Add new content to memory
+  - list_projects: List all your projects
 
 Troubleshooting:
   - Ensure Claude Desktop is installed
   - Check file permissions in config directory
   - Verify MCP server starts without errors
   - Restart Claude Desktop after configuration
+  - Check Claude Desktop logs for connection issues
         """
-        return
+        return self.format_info([help_text.strip()])
