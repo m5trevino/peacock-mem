@@ -93,6 +93,11 @@ class MCPServer:
             }
         }
     
+    async def handle_notifications_initialized(self, params: Dict[str, Any]) -> None:
+        """Handle notifications/initialized - no response needed"""
+        debug_log("Received initialized notification")
+        return None
+    
     async def handle_tools_list(self, params: Dict[str, Any]) -> Dict[str, Any]:
         """Handle tools/list request"""
         debug_log("Listing tools")
@@ -315,6 +320,12 @@ class MCPServer:
         debug_log("Handling request", method=method, id=request_id)
         
         try:
+            # Handle notifications (no response needed)
+            if method == "notifications/initialized":
+                await self.handle_notifications_initialized(params)
+                return None
+            
+            # Handle requests that need responses
             if method == "initialize":
                 result = await self.handle_initialize(params)
             elif method == "tools/list":
@@ -323,15 +334,19 @@ class MCPServer:
                 result = await self.handle_tools_call(params)
             else:
                 debug_log("Unknown method", method=method)
-                return {
-                    "jsonrpc": "2.0",
-                    "id": request_id,
-                    "error": {
-                        "code": -32601,
-                        "message": f"Method not found: {method}"
+                # Only return error response if this was a request (has id)
+                if request_id is not None:
+                    return {
+                        "jsonrpc": "2.0",
+                        "id": request_id,
+                        "error": {
+                            "code": -32601,
+                            "message": f"Method not found: {method}"
+                        }
                     }
-                }
+                return None
             
+            # Only return response if this was a request (has id)
             if request_id is not None:
                 return {
                     "jsonrpc": "2.0",
@@ -343,6 +358,7 @@ class MCPServer:
             
         except Exception as e:
             debug_log("Request handling error", error=str(e))
+            # Only return error response if this was a request (has id)
             if request_id is not None:
                 return {
                     "jsonrpc": "2.0",
